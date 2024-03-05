@@ -1,0 +1,84 @@
+Parameters:
+  PrivateSubnetId1:
+    Type: String
+    Description: The ID of the private subnet in the first availability zone
+  PrivateSubnetId2:
+    Type: String
+    Description: The ID of the private subnet in the second availability zone
+  MyVPC:
+    Type: String
+    Description: The VPC used for our network
+
+Resources:
+  MyEC2Instance1:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-022ff2ae58801e2b3
+      SubnetId: !Ref PrivateSubnetId1
+      SecurityGroupIds:
+        - !Ref MySecurityGroup1
+
+  MyEC2Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-022ff2ae58801e2b3
+      SubnetId: !Ref PrivateSubnetId2
+      SecurityGroupIds:
+        - !Ref MySecurityGroup2
+
+  MySecurityGroup1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP traffic for Instance 1
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+
+  MySecurityGroup2:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP traffic for Instance 2
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+
+Outputs:
+  MyEC2InstancePrivateDNS1:
+    Description: Private DNS of the first EC2 instance
+    Value: !GetAtt MyEC2Instance1.PrivateDnsName
+    Export:
+      Name: !Sub "${AWS::StackName}-EC2InstancePrivateDNS1"
+
+  MyEC2InstancePrivateDNS2:
+    Description: Private DNS of the second EC2 instance
+    Value: !GetAtt MyEC2Instance2.PrivateDnsName
+    Export:
+      Name: !Sub "${AWS::StackName}-EC2InstancePrivateDNS2"
+
+  MySecurityGroup1Id:
+    Description: Security Group ID for MySecurityGroup1
+    Value: !GetAtt MySecurityGroup1.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroup1Id"
+
+  MySecurityGroup2Id:
+    Description: Security Group ID for MySecurityGroup2
+    Value: !GetAtt MySecurityGroup2.GroupId
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroup2Id"
