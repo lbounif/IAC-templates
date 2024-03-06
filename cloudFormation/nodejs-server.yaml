@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Node.js server
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+    Type: String
+  InstanceType: 
+    Type: String
+    Default: t2.micro
+    Description: EC2 instance type (e.g. m1.small)
+  PrivateSubnetId1:
+    Type: String
+    Description: The ID of the private subnet in the first availability zone
+Mappings:
+  RegionMap: 
+    us-east-1: 
+      "AMI": "ami-0ff8a91507f77f867"
+    us-west-1: 
+      "AMI": "ami-0bdb828fd58c52235"
+    eu-west-1: 
+      "AMI": "ami-047bb4163c506cd98"
+Resources:
+  MyVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref MyVPC
+      CidrBlock: 10.0.0.0/24
+  CfnUser:
+    Type: AWS::IAM::User
+    Properties:
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: cloudformation:DescribeStackResource
+            Resource: "*"
+  HostKeys:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName:
+        Ref: CfnUser
+  MySecurityGroup1:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and HTTP traffic for Instance 1
+      VpcId: !Ref MyVPC
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+  NodejsInstance:
+    Type: AWS::EC2::Instance
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            rpm:
+              nodejs: http://nodejs.tchol.org/repocfg/amzn1/nodejs-stable-release.noarch.rpm
+            yum:
+              gcc-c++: []
+              make: []
+              git: []
+              nodejs-compat-symlinks: []
+              npm: []
+    Properties:
+      InstanceType:
+        Ref: InstanceType
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      SecurityGroupIds:
+        - !Ref MySecurityGroup1
+      SubnetId: !Ref PrivateSubnetId1
+      KeyName:
+        Ref: KeyName
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+          - ''
+          - - "#!/bin/bash\n"
+            - 'yum update -y aws-cfn-bootstrap
+
+              '
+            - "## Error reporting helper function\n"
+            - 'function error_exit
+
+              '
+            - "{\n"
+            - '   /opt/aws/bin/cfn-signal -e 1 -r "$1" '''
+            - Ref: WaitHandleNodejsInstance
+            - "'\n"
+            - "   exit 1\n"
+            - "}\n"
+            - "## Initialize CloudFormation bits\n"
+            - "/opt/aws/bin/cfn-init -v -s "
+            - Ref: AWS::StackName
+            - " -r NodejsInstance"
+            - "   --access-key "
+            - Ref: HostKeys
+            - "   --secret-key "
+            - Fn::GetAtt:
+              - HostKeys
+              - SecretAccessKey
+            - "   --region "
+            - Ref: AWS::Region
+            - " > /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)\n"
+            - "## Raise file descriptor limits\n"
+            - 'echo ''* hard nofile 100000'' | tee -a /etc/security/limits.conf
+
+              '
+            - 'echo ''* soft nofile 100000'' | tee -a /etc/security/limits.conf
+
+              '
+            - 'ulimit -n 100000
+
+              '
+            - "## CloudFormation signal that setup is complete\n"
+            - /opt/aws/bin/cfn-signal -e 0 -r "NodejsInstance setup complete" '
+            - Ref: WaitHandleNodejsInstance
+            - "'\n"
+  
+  WaitHandleNodejsInstance:
+    Type: AWS::CloudFormation::WaitConditionHandle
+    Properties: {}
+  WaitConditionNodejsInstance:
+    Type: AWS::CloudFormation::WaitCondition
+    DependsOn: NodejsInstance
+    Properties:
+      Handle:
+        Ref: WaitHandleNodejsInstance
+      Timeout: '300'
+Outputs:
+  InstanceName:
+    Value:
+      Fn::GetAtt:
+      - NodejsInstance
+      - PublicDnsName
+    Description: public DNS name of the new NodejsInstance
+  
+  VPCId:
+    Value: !Ref MyVPC
+    Description: 'ID of the created VPC'
+
+  SubnetId:
+    Value: !Ref PrivateSubnet1
+    Description: 'ID of the created Subnet'
+
+  SecurityGroupId:
+    Value: !Ref MySecurityGroup1
+    Description: 'ID of the created Security Group'

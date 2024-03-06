@@ -1,0 +1,32 @@
+# Join, Ref, Mapping
+Mappings: 
+  RegionMap: 
+    us-east-1: 
+      "AMI": "ami-0ff8a91507f77f867"
+    us-west-1: 
+      "AMI": "ami-0bdb828fd58c52235"
+    eu-west-1: 
+      "AMI": "ami-047bb4163c506cd98"
+Resources:
+#   MyEC2Instance1:
+#     Type: AWS::EC2::Instance
+#     Properties:
+#       InstanceType: t2.micro
+#       ImageId: ami-022ff2ae58801e2b3
+#       Tags:
+#         - Key: "Name"
+#           Value: !Join ["-", [my, inst, from, cloudFormation]] #my-inst-from-cloudFormation
+
+  MyEC2Instance2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", AMI]
+      Tags:
+        - Key: "Name"
+          Value: !Join 
+            - " "
+            - - "My instance in "
+              - !Ref AWS::Region
+
+          
